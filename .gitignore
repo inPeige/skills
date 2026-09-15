@@ -1,0 +1,6 @@
+.DS_Store
+__pycache__/
+*.pyc
+
+# 真实凭据从不入库
+**/config.json

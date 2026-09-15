@@ -1,0 +1,14 @@
+# 真实凭据绝不入库；仓库里只有 config.example.json
+config.json
+
+# 系统与缓存
+.DS_Store
+__pycache__/
+*.pyc
+
+# 合成产物
+*.mp3
+*.wav
+*.pcm
+*.opus
+*.speex

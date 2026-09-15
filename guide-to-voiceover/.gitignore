@@ -1,0 +1,12 @@
+# 系统与缓存
+.DS_Store
+__pycache__/
+*.pyc
+
+# 抓取与产出的本地素材
+out/
+*.mp3
+*.wav
+*.jpg
+*.jpeg
+*.png

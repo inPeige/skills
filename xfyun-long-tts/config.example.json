@@ -1,0 +1,6 @@
+{
+  "app_id": "YOUR_XFYUN_APP_ID",
+  "api_key": "YOUR_XFYUN_API_KEY",
+  "api_secret": "YOUR_XFYUN_API_SECRET",
+  "_comment": "复制为 config.json 后填入自己的讯飞凭据（chmod 600 config.json）。也可用环境变量 XFYUN_APP_ID / XFYUN_API_KEY / XFYUN_API_SECRET 覆盖，优先级：命令行参数 > 环境变量 > config.json。"
+}
