@@ -55,10 +55,21 @@ def main(argv=None):
     if err:
         print(json.dumps({"ok": False, "error": err}, ensure_ascii=False))
         return 2
-    sents = script.get("sentences") or []
-    if not sents:
+    sents = script.get("sentences")
+    if not isinstance(sents, list) or not sents:
         print(json.dumps({"ok": False,
-                          "error": "script.json 没有 sentences"}, ensure_ascii=False))
+                          "error": "script.json 缺少非空 sentences 数组（E003）"},
+                         ensure_ascii=False))
+        return 2
+    # 逐句类型校验：非字符串（例如误写成 [{"text": …}]）若放到下面
+    # PUNCT_RE.sub 去处理，用户看到的是 traceback 而不是机器闸报告（对应 E004）。
+    bad = [i for i, s in enumerate(sents, start=1)
+           if not isinstance(s, str) or not s.strip()]
+    if bad:
+        print(json.dumps({"ok": False,
+                          "error": "sentences 里有空句或非字符串（E004）",
+                          "badIndexes": bad[:10],
+                          "badCount": len(bad)}, ensure_ascii=False))
         return 2
 
     md_path = os.path.join(args.dir, "口播文稿.md")
