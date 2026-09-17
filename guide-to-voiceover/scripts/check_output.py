@@ -49,6 +49,13 @@
   W213 need 项又给了 file               W218 meta.estimatedSec 与实测差 >10%
   W214 补拍项缺 how                     W219 kind / usage 不在封闭词表里
   W215 priority 不是 P0/P1/P2           W220 file 不是图片扩展名
+  W221 文字卡没写 onScreenText
+
+  —— 互动与叙事（voiceover-spec.md §8，2026-09 牧场系列复盘新增）——
+  W222 没有价值兑现段（role:"like"）    W226 meta.axis 缺失或非法（长稿）
+  W223 没有第一人称背书句               W227 body 段缺 suspense（段首悬念）
+  W224 长稿没有观点收束段（outro）      W228 缺/错 highlight，或看点单调
+  W225 body 段缺 logic（因果方向）      W229 长稿没标任何热点元素（meme）
 """
 from __future__ import annotations
 
@@ -64,11 +71,23 @@ DIGIT_RE = re.compile(r"[0-9０-９]")
 PUNCT_RE = re.compile(
     r"""[，。！？；：、,.!?;:…—～~·"'“”‘’（）()\[\]{}<>《》【】「」『』]""")
 
-ROLE_SET = {"hook", "intro", "body", "tip", "cta", "outro"}
+# like = 价值兑现/点赞钩子段；outro = 观点收束段（voiceover-spec §8.1 / §8.3）
+ROLE_SET = {"hook", "intro", "body", "tip", "like", "outro", "cta"}
 # text = 纯文字/动效镜（没有图片文件），对应 talkcraft SHOTBOOK 的 `素材：**文**`
 KIND_SET = {"screenshot", "table", "ui", "need", "text"}
 USAGE_SET = {"full", "crop", "zoom", "blur-bg", "reference-only"}
 IMG_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+
+# §8 叙事字段的取值词表
+LOGIC_SET = {"cause→effect", "effect→cause"}
+HIGHLIGHT_SET = {"reversal", "surprise", "funny", "payoff", "data"}
+AXIS_SET = {"time", "space", "event"}
+
+# §8 的阈值：短稿不该被长稿规则误伤，所以只在规模以上才查
+INTERACTION_MIN_SENTS = 20   # ≥20 句才要求点赞钩子与第一人称背书
+LONG_FORM_MIN_SEGS = 8       # ≥8 段算长稿：要求 outro / 主轴 / 热点元素
+NARRATIVE_MIN_BODY = 5       # ≥5 个 body/tip 段才要求 logic/suspense/highlight
+NARRATIVE_MAX_MISSING = 0.5  # 叙事字段缺失率上限，超过就提醒"还没设计过"
 
 
 def load_json(path, want=dict):
@@ -150,6 +169,22 @@ def check_markdown_matches(md_path, sents):
                                f"        script.json : {a}\n"
                                f"        口播文稿.md : {b}"})
     return out
+
+
+def _narrative_stats(segs, field, valid=None):
+    """统计段级叙事字段（`logic`/`suspense`/`highlight`）的缺失数与非法值数。
+
+    返回 (missing, bad)。字段全部可选，所以"没写"和"写错了"要分开报——
+    没写是"还没设计过"，写错了是词表用错，处理方式不一样。
+    """
+    miss = bad = 0
+    for s in segs:
+        v = s.get(field)
+        if not (isinstance(v, str) and v.strip()):
+            miss += 1
+        elif valid is not None and v not in valid:
+            bad += 1
+    return miss, bad
 
 
 def check(dirpath, cps=5.0, min_sec=20.0, max_sec=300.0):
@@ -281,6 +316,91 @@ def check(dirpath, cps=5.0, min_sec=20.0, max_sec=300.0):
                                         f"{est_sec:.1f}s 差超过 10%（按 "
                                         f"{cps} 字/秒、{total_chars} 字算）——"
                                         f"改了稿子记得同步这个数"})
+
+    # ---------- 互动与叙事（voiceover-spec §8） ----------
+    # 这些字段全部可选，缺了只报 W（--strict 才算失败）：
+    # 它们提醒的是"这一段还没设计过"，不是格式错误。
+    if isinstance(segments, list) and segments:
+        roles = [s.get("role") for s in segments]
+        narr_segs = [s for s in segments if s.get("role") in ("body", "tip")]
+        n_seg, n_narr = len(segments), len(narr_segs)
+
+        # W222 价值兑现：硬数据交付后要挂点赞引导，不能只在结尾 cta 伸手
+        if len(sents) >= INTERACTION_MIN_SENTS and "like" not in roles:
+            warnings.append({"code": "W222",
+                             "msg": f"全文 {len(sents)} 句却没有 role:\"like\" 段——"
+                                    f"每个硬数据交付点之后应跟一次价值兑现+点赞引导"
+                                    f"（§8.1）"})
+        # W223 第一人称背书：攻略结论落到真人验证上才有温度
+        if len(sents) >= INTERACTION_MIN_SENTS and not any(
+                isinstance(s, str) and "我" in s for s in sents):
+            warnings.append({"code": "W223",
+                             "msg": "正文没有一句含「我」——至少一处第一人称实操背书"
+                                    "（时长/结果/情绪）。注意句里的数字必须是真人验过的，"
+                                    "没验过就换成可核验的客观表述（§8.2）"})
+        # W224 观点收束：长稿不能讲完就散场
+        if n_seg >= LONG_FORM_MIN_SEGS and "outro" not in roles:
+            warnings.append({"code": "W224",
+                             "msg": f"{n_seg} 段的长稿没有 role:\"outro\"——"
+                                    f"结尾要收束到「我怎么看 + 你能拿走什么」（§8.3）"})
+
+        if n_narr >= NARRATIVE_MIN_BODY:
+            for field, valid, code, hint in (
+                ("logic", LOGIC_SET, "W225", "先因后果还是先果后因（§8.4）"),
+                ("suspense", None, "W227",
+                 "段首藏住了时间/地点/人物/事件里的哪一项（§8.6）"),
+                ("highlight", HIGHLIGHT_SET, "W228", "这段的看点类型（§8.7）"),
+            ):
+                miss, bad = _narrative_stats(narr_segs, field, valid)
+                if miss / n_narr > NARRATIVE_MAX_MISSING:
+                    warnings.append({"code": code,
+                                     "msg": f"{n_narr} 个 body/tip 段里有 {miss} 段"
+                                            f"没写 {field}：{hint}"})
+                if bad:
+                    warnings.append({"code": code,
+                                     "msg": f"有 {bad} 段的 {field} 取值不对"
+                                            + (f"，应取 {sorted(valid)}" if valid
+                                               else "") + f"：{hint}"})
+                if field == "highlight":
+                    seq = [s.get("highlight") for s in narr_segs]
+                    run = 1
+                    for i in range(1, len(seq)):
+                        if seq[i] and seq[i] == seq[i - 1]:
+                            run += 1
+                            if run == 3:
+                                warnings.append(
+                                    {"code": "W228",
+                                     "msg": f"连续 3 段 highlight 都是「{seq[i]}」，"
+                                            f"看点单调，相邻段要换类型（§8.7）"})
+                        else:
+                            run = 1
+                    kinds = {v for v in seq if v}
+                    if kinds and len(kinds) < 3:
+                        warnings.append(
+                            {"code": "W228",
+                             "msg": f"全片只用了 {len(kinds)} 种看点类型"
+                                    f"（{sorted(kinds)}），一集至少覆盖 3 种（§8.7）"})
+                    if sum(1 for v in seq if v == "data") > len(seq) / 2:
+                        warnings.append(
+                            {"code": "W228",
+                             "msg": "超过一半的段是 highlight:\"data\"，"
+                                    "全是数据冲击等于没有冲击（§8.7）"})
+            info["narrative"] = f"{n_narr - _narrative_stats(narr_segs, 'highlight')[0]}/{n_narr}"
+
+        # W226 叙事主轴：长稿要在 meta.axis 声明按什么维度推进
+        axis = (script.get("meta") or {}).get("axis")
+        if n_seg >= LONG_FORM_MIN_SEGS and axis not in AXIS_SET:
+            warnings.append({"code": "W226",
+                             "msg": f"{n_seg} 段的长稿 meta.axis="
+                                    f"{axis!r}，应为 {sorted(AXIS_SET)} 之一"
+                                    f"（时间/空间/事件走向），并在 intro 里说破（§8.5）"})
+        # W229 热点元素：长稿至少标几处可以上当期热点的地方
+        if n_seg >= LONG_FORM_MIN_SEGS and not any(
+                s.get("meme") for s in segments):
+            warnings.append({"code": "W229",
+                             "msg": f"{n_seg} 段的长稿没有任何段标 meme——"
+                                    f"在悬念兑现处和看点处留 2–4 处热点位"
+                                    f"（BGM/特效/表情动作），别写死热点名（§8.8）"})
 
     # ---------- assets.plan.json ----------
     # 注意用 `is not None` 而不是真值判断：`{}` / `[]` 是假值，
@@ -474,7 +594,8 @@ def main(argv=None):
         print(f"句数 {i.get('sentences', '?')} · 字数 {i.get('chars', '?')} · "
               f"估算 {i.get('estimatedSec', '?')}s · 段 {i.get('segments', '?')} · "
               f"素材 {i.get('assets', '?')}（原图 {i.get('guideImages', '?')}）· "
-              f"待补拍 {i.get('needs', 0)}（P0 {i.get('p0Needs', 0)}）")
+              f"待补拍 {i.get('needs', 0)}（P0 {i.get('p0Needs', 0)}）· "
+              f"看点标注 {i.get('narrative', '-')}")
         if errors:
             print(f"\n❌ {len(errors)} 个错误：")
             for e in errors:

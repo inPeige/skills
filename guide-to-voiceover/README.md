@@ -28,8 +28,8 @@ python3 "$SKILL/scripts/make_tts_text.py" --dir work
 
 | 文件 | 内容 |
 |---|---|
-| `script.json` | 口播稿，`sentences` 零标点，对接 `video-talkcraft` 做字级时间戳 |
-| `口播文稿.md` | 口播稿人读版：分段、时长、事实核对、未采用内容 |
+| `script.json` | 口播稿，`sentences` 零标点，对接 `video-talkcraft` 做字级时间戳；段级带 `logic`/`suspense`/`highlight`/`meme` |
+| `口播文稿.md` | 口播稿人读版：分段、时长、事实核对（含「个人背书句」单列）、未采用内容 |
 | `tts.txt` | 配音文本（**带标点**、一句一行），喂给 `xfyun-long-tts` |
 | `assets.plan.json` | 图文对应：每段用哪些图、怎么用、还缺什么 |
 | `图文对应表.md` | 图文对应人读版：一张表读完 |
@@ -47,6 +47,11 @@ python3 "$SKILL/scripts/make_tts_text.py" --dir work
 4. **一份稿子出两个文本**：`tts.txt` 带标点（TTS 要标点才念得有起伏），
    `script.json` 零标点（逐字时间戳 + 字幕直出要求零标点）。
    两版必须逐字一致，`make_tts_text.py` 会当场核对。
+5. **互动与叙事是硬闸，不是润色**（`voiceover-spec.md` §8）：
+   ≥20 句必须有 `like` 价值兑现段和第一人称背书句；≥8 段的长稿必须有
+   `meta.axis` 主轴和 `outro` 观点收束；body 段要标 `logic`/`suspense`/`highlight`。
+   缺了在 `--strict` 下报 W222–W229。
+   **背书句里的数字必须真人验过**——没验过就用可核验的客观表述，不许编。
 
 ## 目录
 
@@ -58,7 +63,7 @@ guide-to-voiceover/
 │   ├── check_output.py             口播稿 / 素材计划 机器闸
 │   └── make_tts_text.py            生成 TTS 配音文本并核对两版一致
 └── references/
-    ├── voiceover-spec.md           攻略→口播 的改写规范（结构/句长/取舍/事实红线）
+    ├── voiceover-spec.md           攻略→口播 的改写规范（结构/句长/取舍/事实红线/§8 互动与叙事）
     ├── asset-mapping-spec.md       配图规范（素材类型/覆盖规则/用法/缺口）
     └── site-adapters.md            抓取排障（已验证站点 + 无头 Chrome 三个坑）
 ```

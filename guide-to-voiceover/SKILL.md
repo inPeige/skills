@@ -20,8 +20,9 @@ metadata:
 **输出**：两样东西，外加机器可读版和机器闸报告
 
 三份规范，**必须先读**：
-- `references/voiceover-spec.md` — 怎么把"查阅型攻略"改写成"线性口播"
-- `references/asset-mapping-spec.md` — 怎么配图、怎么标缺口
+- `references/voiceover-spec.md` — 怎么把"查阅型攻略"改写成"线性口播"；
+  **§8 是互动与叙事规则**（点赞钩子、第一人称背书、因果/悬念/看点），别只顾 §1–§5 的"说得对"
+- `references/asset-mapping-spec.md` — 怎么配图、怎么标缺口（§6 讲段级叙事字段怎么落到画面）
 - `references/site-adapters.md` — 抓取排障与已验证站点
 
 ---
@@ -95,6 +96,13 @@ stdout 是一行 JSON 摘要。**先看 `meta.textChars` 和 `imageCount` 合不
 5. **数字一律汉字**（`5000`→`五千`）——下游配音时间戳按文本逐字锚定
 6. **砍掉查阅型内容**（对照表、大全），一集只讲一件事
 7. **事实红线**：等级/成本/坐标/NPC 名原样保留；攻略与截图冲突时以截图为准并标注
+8. **互动：每个硬数据交付点后挂一次价值兑现**（`role:"like"` 段，四段式：
+   这招是什么 → 量化好处 → 点赞请求 → 下集钩子）。≥20 句至少 1 次，别只在结尾伸手
+9. **背书：至少一处"我"字句**（时长/结果/情绪 + 验证方式）。
+   **句里的数字必须真人验过**，没验过就换成表里算得出来的客观表述，不许编
+10. **叙事：长稿（≥8 段）要有 `meta.axis` 主轴 + `outro` 观点收束**；
+    body/tip 段标 `logic` / `suspense` / `highlight`，段级 `meme` 留热点位
+    （**不写死热点名**）。全部见 `voiceover-spec.md` §8
 
 产出 `script.json`：
 
@@ -102,10 +110,16 @@ stdout 是一行 JSON 摘要。**先看 `meta.textChars` 和 `imageCount` 合不
 {
   "sentences": ["五十级加一套房子就能开牧场", "..."],
   "meta": { "title": "...", "source": "...", "target": "douyin",
-            "estimatedSec": 62.5, "charsPerSec": 5.0 },
+            "estimatedSec": 62.5, "charsPerSec": 5.0, "axis": "time" },
   "segments": [
     { "id": "seg01", "role": "hook", "heading": "开场钩子",
-      "sentences": [0, 1], "assets": ["img01"] }
+      "sentences": [0, 1], "assets": ["img01"] },
+    { "id": "seg05", "role": "body", "heading": "七天模式怎么操作",
+      "logic": "cause→effect", "suspense": "藏住时间：先不说第几天收",
+      "highlight": "data", "meme": "数字落地时上当期热梗 BGM",
+      "sentences": [10, 11, 12, 13], "assets": ["img02"] },
+    { "id": "seg06", "role": "like", "heading": "价值兑现",
+      "sentences": [14, 15], "assets": ["card04"] }
   ]
 }
 ```
@@ -114,7 +128,11 @@ stdout 是一行 JSON 摘要。**先看 `meta.textChars` 和 `imageCount` 合不
 直接读这个字段逐句做时间戳），额外字段不影响它。句号范围必须**无重叠、无遗漏**地
 覆盖所有句子（`check_output.py` E008 强制无遗漏；重叠覆盖只报 W208 警告）。
 
-`role` 取值：`hook` / `intro` / `body` / `tip` / `cta` / `outro`。
+`role` 取值：`hook` / `intro` / `body` / `like` / `tip` / `outro` / `cta`。
+`like` 与 `outro` 是**独立成段**的（不塞进 body 段尾），分镜才能给它们专门镜头。
+
+段级叙事字段 `logic` / `suspense` / `highlight` / `meme` 与 `meta.axis`
+全部可选，但缺了会在 `--strict` 下报 W225–W229——它们提醒的是"这段还没设计过"。
 
 同时产出人读的 `口播文稿.md`（格式见 voiceover-spec.md §6）。
 
@@ -145,6 +163,11 @@ python3 "$SKILL/scripts/check_output.py" --dir <产出目录>
 机器判定的部分：结构完整性、句子索引覆盖、图片文件存在性、每段配图、
 与原攻略图片对账、阿拉伯数字、标点、句长、素材词表、段序、估算时长，
 以及**人读版 `口播文稿.md` 与 `script.json` 是否逐字一致**（E017–E020）。
+
+还有 **§8 的互动与叙事闸**（W222–W229）：点赞钩子、第一人称背书、观点收束、
+因果方向、叙事主轴、段首悬念、看点密度与单调、热点元素。
+这几项是**规模阈值触发**的（≥20 句查互动、≥8 段查长稿结构、≥5 个 body 段查叙事三件套），
+短视频不会被长稿规则误伤。
 
 ```bash
 python3 "$SKILL/scripts/check_output.py" --dir <产出目录> > check_report.json
@@ -243,6 +266,8 @@ python3 scripts/timestamps_cpu.py audio/voice.mp3 script.json audio/timestamps.j
 | 图片糊 | 正常。`usage: zoom` 局部放大，或立一条 `kind:"need"` 素材去补拍 |
 | 口播稿太长 | 拆上下集。**别压缩语速**，观众听得出 |
 | 稿子里的数字被改写了 | 绝对不行。攻略数字是事实红线 |
+| 报 W222 / W223 | 缺点赞钩子或第一人称背书。补 `like` 段 / "我"字句；**别为凑情绪编造"我养了半个月"** |
+| 报 W224–W229 | 长稿缺叙事设计。补 `meta.axis`、`outro` 段，给 body 段标 `logic`/`suspense`/`highlight`/`meme` |
 
 ## 不做的事
 
