@@ -269,7 +269,7 @@ E015 只检查**声称来自原攻略**的素材，判据二选一：
   "id": "card04",
   "kind": "text",
   "what": "六类动物单只日均对比卡，把金钱龟那条做成最后反超的定格（承接 highlight:reversal）",
-  "onScreenText": ["孔雀 三十六", "垂耳兔 六十", "金钱龟 六十八点八"],
+  "onScreenText": ["孔雀 36", "垂耳兔 60", "金钱龟 68.8"],
   "hotElement": ["反超瞬间：当期热梗 BGM + 数字定格特效位"],
   "usable": true,
   "usage": "full",

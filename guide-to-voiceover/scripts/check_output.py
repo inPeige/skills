@@ -18,7 +18,7 @@
 
 检查项:
   E  结构性错误（缺文件、字段缺失、索引越界、图片文件不存在、补拍项标错）
-  W  质量问题（句子过长过短、阿拉伯数字、某段没配图、素材闲置、补拍项缺 how）
+  W  质量问题（句子过长过短、某段没配图、素材闲置、补拍项缺 how、§8 叙事三件套）
 
 补拍项统一用 `"kind": "need"` 的素材条目表示（没有 file），这样每段都有素材可引用，
 缺口本身也是产出的一部分。
@@ -40,7 +40,7 @@
   W101 没有 guide.json，跳过原图对账    W209 段的 role 不在允许集合内
   W201 估算时长低于下限                 W210 素材缺 what（画面内容说明）
   W202 估算时长高于上限                 W211 可用素材没被任何段用上
-  W203 句子含阿拉伯数字                 W212 原攻略的图没在 assets 里交代
+  W203 （已废弃：数字形态不检查，见 voiceover-spec §2）
   W204 句子含标点（要求零标点）         W213 标了 kind:need 却又给了 file
   W205 句子超过 42 字                   W214 补拍项缺 how（怎么拿到）
   W206 句子少于 4 字，太碎              W215 补拍项 priority 不是 P0/P1/P2
@@ -65,11 +65,13 @@ import os
 import re
 import sys
 
-DIGIT_RE = re.compile(r"[0-9０-９]")
 # 句子契约是「零标点」：下游配音按文本逐字锚定、字幕直出都要求零标点。
 # 带标点的人读版写在 口播文稿.md 里，不进 sentences。
+# 小数点不算标点：`17.8` / `2.5` 里的点要保留（数字就是数字，见 voiceover-spec §2），
+# 所以用 (?<!\d)\.(?!\d) 只匹配不在两个数字之间的点。
 PUNCT_RE = re.compile(
-    r"""[，。！？；：、,.!?;:…—～~·"'“”‘’（）()\[\]{}<>《》【】「」『』]""")
+    r"""[，。！？；：、,!?;:…—～~·"'“”‘’（）()\[\]{}<>《》【】「」『』]"""
+    r"""|(?<!\d)\.(?!\d)""")
 
 # like = 价值兑现/点赞钩子段；outro = 观点收束段（voiceover-spec §8.1 / §8.3）
 ROLE_SET = {"hook", "intro", "body", "tip", "like", "outro", "cta"}
@@ -232,10 +234,6 @@ def check(dirpath, cps=5.0, min_sec=20.0, max_sec=300.0):
     for i, s in enumerate(sents):
         if not isinstance(s, str):
             continue  # E004 已经报过；继续跑正则只会抛 TypeError
-        if DIGIT_RE.search(s):
-            warnings.append({"code": "W203", "sentence": i,
-                             "msg": f"第 {i} 句含阿拉伯数字，配音时间戳无法逐字对位："
-                                    f"「{s[:40]}」→ 请改成汉字"})
         if PUNCT_RE.search(s):
             warnings.append({"code": "W204", "sentence": i,
                              "msg": f"第 {i} 句含标点，口播稿 sentences 要求零标点"
